@@ -10,10 +10,10 @@ import type {
 } from '../types';
 import { questions as allQuestions } from '../data/questions';
 
-type GamePhase = 'menu' | 'playing' | 'review' | 'result';
+export type GamePhase = 'main' | 'mode_select' | 'playing' | 'result';
 
 interface GameState {
-  // 게임 설정
+  // 화면 흐름
   phase: GamePhase;
   selectedCategory: Category | 'all';
   selectedDifficulty: Difficulty | 'all';
@@ -23,6 +23,13 @@ interface GameState {
   currentIndex: number;
   answers: AnswerRecord[];
   timeRemaining: number;
+  isAnswered: boolean;
+  lastAnswerCorrect: boolean | null;
+
+  // 콤보 & 보너스
+  currentCombo: number;
+  maxCombo: number;
+  speedBonuses: number[];
 
   // 결과 & 리더보드
   results: GameResult[];
@@ -32,6 +39,8 @@ interface GameState {
   settings: UserSettings;
 
   // 액션
+  goToMain: () => void;
+  goToModeSelect: () => void;
   setCategory: (category: Category | 'all') => void;
   setDifficulty: (difficulty: Difficulty | 'all') => void;
   startGame: () => void;
@@ -61,14 +70,14 @@ function loadFromStorage<T>(key: string, fallback: T): T {
 }
 
 const defaultSettings: UserSettings = {
-  playerName: '플레이어',
+  playerName: '',
   questionsPerGame: 10,
   timeLimit: 30,
   soundEnabled: true,
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
-  phase: 'menu',
+  phase: 'main',
   selectedCategory: 'all',
   selectedDifficulty: 'all',
 
@@ -76,10 +85,19 @@ export const useGameStore = create<GameState>((set, get) => ({
   currentIndex: 0,
   answers: [],
   timeRemaining: 0,
+  isAnswered: false,
+  lastAnswerCorrect: null,
+
+  currentCombo: 0,
+  maxCombo: 0,
+  speedBonuses: [],
 
   results: loadFromStorage<GameResult[]>('quiz-results', []),
   leaderboard: loadFromStorage<LeaderboardEntry[]>('quiz-leaderboard', []),
   settings: loadFromStorage<UserSettings>('quiz-settings', defaultSettings),
+
+  goToMain: () => set({ phase: 'main' }),
+  goToModeSelect: () => set({ phase: 'mode_select' }),
 
   setCategory: (category) => set({ selectedCategory: category }),
   setDifficulty: (difficulty) => set({ selectedDifficulty: difficulty }),
@@ -104,42 +122,73 @@ export const useGameStore = create<GameState>((set, get) => ({
       currentIndex: 0,
       answers: [],
       timeRemaining: settings.timeLimit,
+      isAnswered: false,
+      lastAnswerCorrect: null,
+      currentCombo: 0,
+      maxCombo: 0,
+      speedBonuses: [],
     });
   },
 
   submitAnswer: (selectedAnswer, timeSpent) => {
-    const { questions, currentIndex, answers } = get();
+    const { questions, currentIndex, answers, currentCombo, maxCombo, speedBonuses, settings } = get();
     const question = questions[currentIndex];
+    const isCorrect = selectedAnswer !== -1 && selectedAnswer === question.correctAnswer;
 
     const record: AnswerRecord = {
       questionId: question.id,
       selectedAnswer,
-      isCorrect: selectedAnswer === question.correctAnswer,
+      isCorrect,
       timeSpent,
     };
 
-    set({ answers: [...answers, record], phase: 'review' });
+    const newCombo = isCorrect ? currentCombo + 1 : 0;
+    const newMaxCombo = Math.max(maxCombo, newCombo);
+
+    // 스피드 보너스: 정답 + 시간제한 있을 때, 남은 시간 비례 최대 5점
+    const speedBonus =
+      isCorrect && settings.timeLimit > 0
+        ? parseFloat(
+            (((settings.timeLimit - Math.min(timeSpent, settings.timeLimit)) / settings.timeLimit) * 5).toFixed(1)
+          )
+        : 0;
+
+    set({
+      answers: [...answers, record],
+      isAnswered: true,
+      lastAnswerCorrect: isCorrect,
+      currentCombo: newCombo,
+      maxCombo: newMaxCombo,
+      speedBonuses: [...speedBonuses, speedBonus],
+    });
   },
 
   nextQuestion: () => {
-    const { currentIndex, questions } = get();
+    const { currentIndex, questions, settings } = get();
     if (currentIndex + 1 >= questions.length) {
       get().finishGame();
     } else {
       set({
         currentIndex: currentIndex + 1,
-        phase: 'playing',
-        timeRemaining: get().settings.timeLimit,
+        isAnswered: false,
+        lastAnswerCorrect: null,
+        timeRemaining: settings.timeLimit,
       });
     }
   },
 
   finishGame: () => {
-    const { questions, answers, selectedCategory, selectedDifficulty, settings, results, leaderboard } = get();
+    const {
+      questions, answers, selectedCategory, selectedDifficulty,
+      settings, results, leaderboard, maxCombo, speedBonuses,
+    } = get();
 
     const correctCount = answers.filter((a) => a.isCorrect).length;
     const totalTime = answers.reduce((sum, a) => sum + a.timeSpent, 0);
-    const score = Math.round((correctCount / questions.length) * 1000);
+    const baseScore = Math.round((correctCount / questions.length) * 1000);
+    const speedBonus = parseFloat(speedBonuses.reduce((s, b) => s + b, 0).toFixed(1));
+    const comboBonus = maxCombo >= 3 ? maxCombo * 10 : 0;
+    const score = baseScore + Math.round(speedBonus) + comboBonus;
 
     const result: GameResult = {
       id: crypto.randomUUID(),
@@ -151,11 +200,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       score,
       timeTaken: totalTime,
       answers,
+      maxCombo,
+      speedBonus,
+      comboBonus,
     };
 
     const entry: LeaderboardEntry = {
       id: result.id,
-      playerName: settings.playerName,
+      playerName: settings.playerName || '익명',
       score,
       correctAnswers: correctCount,
       totalQuestions: questions.length,
@@ -172,20 +224,21 @@ export const useGameStore = create<GameState>((set, get) => ({
     localStorage.setItem('quiz-results', JSON.stringify(newResults));
     localStorage.setItem('quiz-leaderboard', JSON.stringify(newLeaderboard));
 
-    set({
-      phase: 'result',
-      results: newResults,
-      leaderboard: newLeaderboard,
-    });
+    set({ phase: 'result', results: newResults, leaderboard: newLeaderboard });
   },
 
   resetGame: () => {
     set({
-      phase: 'menu',
+      phase: 'main',
       questions: [],
       currentIndex: 0,
       answers: [],
       timeRemaining: 0,
+      isAnswered: false,
+      lastAnswerCorrect: null,
+      currentCombo: 0,
+      maxCombo: 0,
+      speedBonuses: [],
     });
   },
 

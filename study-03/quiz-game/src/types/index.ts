@@ -14,7 +14,7 @@ export interface Question {
 
 export interface AnswerRecord {
   questionId: string;
-  selectedAnswer: number;
+  selectedAnswer: number; // -1 = 타임아웃
   isCorrect: boolean;
   timeSpent: number; // 초 단위
 }
@@ -29,6 +29,9 @@ export interface GameResult {
   score: number;
   timeTaken: number;
   answers: AnswerRecord[];
+  maxCombo?: number;
+  speedBonus?: number;
+  comboBonus?: number;
 }
 
 export interface LeaderboardEntry {

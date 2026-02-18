@@ -1,26 +1,26 @@
 import { useGameStore } from './store/gameStore';
-import MenuScreen from './components/MenuScreen';
-import QuizScreen from './components/QuizScreen';
-import ReviewScreen from './components/ReviewScreen';
-import ResultScreen from './components/ResultScreen';
+import MainScreen from './pages/MainScreen';
+import ModeSelectScreen from './pages/ModeSelectScreen';
+import GameScreen from './pages/GameScreen';
+import ResultScreen from './pages/ResultScreen';
 
 function App() {
   const phase = useGameStore((s) => s.phase);
 
   const renderScreen = () => {
     switch (phase) {
+      case 'mode_select':
+        return <ModeSelectScreen />;
       case 'playing':
-        return <QuizScreen />;
-      case 'review':
-        return <ReviewScreen />;
+        return <GameScreen />;
       case 'result':
         return <ResultScreen />;
-      default:
-        return <MenuScreen />;
+      default: // 'main'
+        return <MainScreen />;
     }
   };
 
-  // key={phase} 로 phase 변경 시마다 re-mount → screen-enter 애니메이션 재실행
+  // key={phase} → phase 변경마다 re-mount → screen-enter 애니메이션 재실행
   return (
     <div key={phase} className="screen-enter min-h-screen">
       {renderScreen()}
