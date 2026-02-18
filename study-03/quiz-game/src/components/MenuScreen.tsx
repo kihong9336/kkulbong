@@ -2,6 +2,14 @@ import { useGameStore } from '../store/gameStore';
 import { questions as allQuestions, categoryLabels, difficultyLabels } from '../data/questions';
 import type { Category, Difficulty } from '../types';
 
+const categoryEmojis: Record<Category | 'all', string> = {
+  all: '🌐',
+  science: '🔬',
+  history: '📜',
+  geography: '🗺️',
+  culture: '🎭',
+};
+
 const categories: (Category | 'all')[] = ['all', 'science', 'history', 'geography', 'culture'];
 const difficulties: (Difficulty | 'all')[] = ['all', 'easy', 'medium', 'hard'];
 
@@ -14,70 +22,100 @@ export default function MenuScreen() {
     return true;
   }).length;
 
+  const playCount = Math.min(settings.questionsPerGame, filteredCount);
   const canStart = filteredCount > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">상식 퀴즈 게임</h1>
-        <p className="text-center text-gray-500 mb-8">안녕하세요, {settings.playerName}님!</p>
+    <div className="min-h-screen bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 flex items-center justify-center p-4">
+      {/* 배경 장식 */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 -right-24 w-72 h-72 bg-white/5 rounded-full blur-3xl" />
+        <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
+      </div>
 
-        <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">카테고리</h2>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setCategory(cat)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedCategory === cat
-                    ? 'bg-indigo-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {categoryLabels[cat]}
-              </button>
-            ))}
+      <div className="relative bg-white/10 backdrop-blur-md rounded-3xl shadow-2xl p-6 w-full max-w-md border border-white/20">
+        {/* 타이틀 */}
+        <div className="text-center mb-8">
+          <div className="text-5xl mb-3">🧠</div>
+          <h1 className="text-3xl font-black text-white tracking-tight">상식 퀴즈</h1>
+          <p className="text-white/60 mt-1 text-sm">
+            안녕하세요,{' '}
+            <span className="font-bold text-white">{settings.playerName}</span>님!
+          </p>
+        </div>
+
+        {/* 카테고리 */}
+        <div className="mb-5">
+          <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-3">카테고리</p>
+          <div className="grid grid-cols-3 gap-2">
+            {categories.map((cat) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`flex flex-col items-center gap-1 py-3 rounded-2xl text-xs font-bold transition-all duration-200 active:scale-95 ${
+                    isActive
+                      ? 'bg-white text-indigo-600 shadow-lg shadow-white/20'
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  }`}
+                >
+                  <span className="text-xl">{categoryEmojis[cat]}</span>
+                  <span>{categoryLabels[cat]}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
+        {/* 난이도 */}
         <div className="mb-6">
-          <h2 className="text-sm font-semibold text-gray-600 mb-2">난이도</h2>
-          <div className="flex flex-wrap gap-2">
-            {difficulties.map((diff) => (
-              <button
-                key={diff}
-                onClick={() => setDifficulty(diff)}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  selectedDifficulty === diff
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {difficultyLabels[diff]}
-              </button>
-            ))}
+          <p className="text-white/50 text-xs font-semibold uppercase tracking-widest mb-3">난이도</p>
+          <div className="flex gap-2">
+            {difficulties.map((diff) => {
+              const isActive = selectedDifficulty === diff;
+              return (
+                <button
+                  key={diff}
+                  onClick={() => setDifficulty(diff)}
+                  className={`flex-1 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 active:scale-95 ${
+                    isActive
+                      ? 'bg-white text-indigo-600 shadow-md'
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  }`}
+                >
+                  {difficultyLabels[diff]}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="text-center text-sm text-gray-500 mb-6">
-          문제 수: <span className="font-bold text-gray-700">{filteredCount}문제</span> 중{' '}
-          <span className="font-bold text-gray-700">{Math.min(settings.questionsPerGame, filteredCount)}문제</span> 출제
+        {/* 게임 정보 */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2">
+            <span className="text-white/50 text-xs">문제</span>
+            <span className="text-white font-black">{playCount}개</span>
+          </div>
           {settings.timeLimit > 0 && (
-            <span> | 제한시간: <span className="font-bold text-gray-700">{settings.timeLimit}초</span></span>
+            <div className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2">
+              <span className="text-white/50 text-xs">제한시간</span>
+              <span className="text-white font-black">{settings.timeLimit}초</span>
+            </div>
           )}
         </div>
 
+        {/* 시작 버튼 */}
         <button
           onClick={startGame}
           disabled={!canStart}
-          className={`w-full py-3 rounded-xl text-lg font-bold transition-all ${
+          className={`w-full py-4 rounded-2xl text-lg font-black tracking-wide transition-all duration-200 ${
             canStart
-              ? 'bg-indigo-500 text-white hover:bg-indigo-600 active:scale-95'
-              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              ? 'bg-white text-indigo-600 hover:bg-indigo-50 active:scale-95 shadow-lg shadow-white/20'
+              : 'bg-white/20 text-white/40 cursor-not-allowed'
           }`}
         >
-          게임 시작
+          {canStart ? '게임 시작 🚀' : '문제가 없습니다'}
         </button>
       </div>
     </div>

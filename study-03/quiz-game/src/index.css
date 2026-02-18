@@ -8,3 +8,80 @@ body {
 #root {
   min-height: 100vh;
 }
+
+/* ── Screen transition ── */
+@keyframes screenEnter {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.screen-enter {
+  animation: screenEnter 0.35s ease-out forwards;
+}
+
+/* ── Option stagger fade-in ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  opacity: 0;
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+.option-item:nth-child(1) { animation-delay: 0.05s; }
+.option-item:nth-child(2) { animation-delay: 0.12s; }
+.option-item:nth-child(3) { animation-delay: 0.19s; }
+.option-item:nth-child(4) { animation-delay: 0.26s; }
+
+/* ── Bounce-in (review result icon) ── */
+@keyframes bounceIn {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.15); }
+  75%  { transform: scale(0.93); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.bounce-in {
+  animation: bounceIn 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ── Shake (wrong answer card) ── */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  15%       { transform: translateX(-8px) rotate(-0.5deg); }
+  30%       { transform: translateX(8px)  rotate(0.5deg); }
+  45%       { transform: translateX(-5px); }
+  60%       { transform: translateX(5px); }
+  75%       { transform: translateX(-3px); }
+  90%       { transform: translateX(3px); }
+}
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* ── Timer urgent pulse ── */
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); }
+  50%       { transform: scale(1.08); }
+}
+.timer-urgent {
+  animation: timerPulse 0.4s ease-in-out infinite;
+}
+
+/* ── Grade pop (result screen) ── */
+@keyframes gradePop {
+  0%   { transform: scale(0) rotate(-15deg); opacity: 0; }
+  55%  { transform: scale(1.25) rotate(5deg); }
+  80%  { transform: scale(0.93) rotate(-2deg); }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+.grade-pop {
+  animation: gradePop 0.7s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ── Score reveal ── */
+@keyframes scoreReveal {
+  from { transform: scale(0.8); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.score-reveal {
+  animation: scoreReveal 0.4s 0.35s ease-out both;
+}
