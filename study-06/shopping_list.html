@@ -61,6 +61,7 @@
     white-space: nowrap;
   }
   button.add-btn:hover { background: #3370d4; }
+  button.add-btn:disabled { background: #a0aec0; cursor: not-allowed; }
   .summary {
     font-size: 0.85rem;
     color: #718096;
@@ -119,6 +120,22 @@
     padding: 32px 0;
     font-size: 0.95rem;
   }
+  .loading {
+    text-align: center;
+    color: #a0aec0;
+    padding: 32px 0;
+    font-size: 0.95rem;
+  }
+  .error-msg {
+    background: #fff5f5;
+    border: 1px solid #fed7d7;
+    color: #c53030;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+    display: none;
+  }
 </style>
 </head>
 <body>
@@ -126,26 +143,54 @@
   <h1>🛒 쇼핑 리스트</h1>
   <div class="input-row">
     <input type="text" id="newItem" placeholder="아이템 이름 입력..." autocomplete="off">
-    <button class="add-btn" onclick="addItem()">추가</button>
+    <button class="add-btn" id="addBtn" onclick="addItem()">추가</button>
   </div>
+  <div class="error-msg" id="errorMsg"></div>
   <div class="summary" id="summary"></div>
+  <div class="loading" id="loading">불러오는 중...</div>
   <ul id="list"></ul>
   <div class="empty" id="empty" style="display:none">아직 아이템이 없어요.<br>위에서 추가해 보세요!</div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-  const STORAGE_KEY = 'shopping_list';
+  const SUPABASE_URL = 'https://jpkbmdislwlymquapftq.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impwa2JtZGlzbHdseW1xdWFwZnRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE1ODAwMjIsImV4cCI6MjA4NzE1NjAyMn0.1HYK9BUqPs74ReVmYSOUCARG7JKyIgXfeM9sLzKYldI';
 
-  function load() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let items = [];
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
   }
 
-  function save(items) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  async function loadItems() {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('list').innerHTML = '';
+    document.getElementById('empty').style.display = 'none';
+    showError('');
+
+    const { data, error } = await db
+      .from('shopping_items')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    document.getElementById('loading').style.display = 'none';
+
+    if (error) {
+      showError('데이터를 불러오지 못했습니다: ' + error.message);
+      return;
+    }
+
+    items = data || [];
+    render();
   }
 
   function render() {
-    const items = load();
     const ul = document.getElementById('list');
     const empty = document.getElementById('empty');
     const summary = document.getElementById('summary');
@@ -167,12 +212,12 @@
 
       const box = document.createElement('div');
       box.className = 'checkbox' + (item.checked ? ' on' : '');
-      box.onclick = () => toggleItem(item.id);
+      box.onclick = () => toggleItem(item.id, item.checked);
 
       const name = document.createElement('span');
       name.className = 'item-name';
       name.textContent = item.name;
-      name.onclick = () => toggleItem(item.id);
+      name.onclick = () => toggleItem(item.id, item.checked);
 
       const del = document.createElement('button');
       del.className = 'del-btn';
@@ -185,28 +230,67 @@
     });
   }
 
-  function addItem() {
+  async function addItem() {
     const input = document.getElementById('newItem');
+    const addBtn = document.getElementById('addBtn');
     const name = input.value.trim();
     if (!name) { input.focus(); return; }
 
-    const items = load();
-    const newId = items.length > 0 ? Math.max(...items.map(i => i.id)) + 1 : 1;
-    items.push({ id: newId, name, checked: false });
-    save(items);
+    addBtn.disabled = true;
+    showError('');
+
+    const { data, error } = await db
+      .from('shopping_items')
+      .insert([{ name, checked: false }])
+      .select()
+      .single();
+
+    addBtn.disabled = false;
+
+    if (error) {
+      showError('추가 실패: ' + error.message);
+      return;
+    }
+
+    items.push(data);
     input.value = '';
     input.focus();
     render();
   }
 
-  function toggleItem(id) {
-    const items = load();
-    const item = items.find(i => i.id === id);
-    if (item) { item.checked = !item.checked; save(items); render(); }
+  async function toggleItem(id, currentChecked) {
+    showError('');
+
+    const { data, error } = await db
+      .from('shopping_items')
+      .update({ checked: !currentChecked })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      showError('업데이트 실패: ' + error.message);
+      return;
+    }
+
+    items = items.map(i => i.id === id ? data : i);
+    render();
   }
 
-  function deleteItem(id) {
-    save(load().filter(i => i.id !== id));
+  async function deleteItem(id) {
+    showError('');
+
+    const { error } = await db
+      .from('shopping_items')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      showError('삭제 실패: ' + error.message);
+      return;
+    }
+
+    items = items.filter(i => i.id !== id);
     render();
   }
 
@@ -214,7 +298,7 @@
     if (e.key === 'Enter') addItem();
   });
 
-  render();
+  loadItems();
 </script>
 </body>
 </html>
